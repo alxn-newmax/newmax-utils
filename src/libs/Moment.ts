@@ -123,7 +123,7 @@ class Moment {
    * @param {string} [format=YYYY-MM-DDTHH:mm:ss] - Формат маски на выходе. Default: "YYYY-MM-DDTHH:mm:ss".
    * @returns {string} Начало дня в указанном формате.
    */
-  startDate(date: string | number, mask: string, format: string = 'YYYY-MM-DDTHH:mm:ss'): string {
+  startDate(date: string | number, mask: string | undefined, format: string = 'YYYY-MM-DDTHH:mm:ss'): string {
     return moment(date, mask).startOf('day').format(format);
   }
 
@@ -134,7 +134,7 @@ class Moment {
    * @param {string} [format=YYYY-MM-DDTHH:mm:ss] - Формат маски на выходе. Default: "YYYY-MM-DDTHH:mm:ss".
    * @returns {string} Конец дня в указанном формате.
    */
-  endDate(date: string | number, mask: string, format: string = 'YYYY-MM-DDTHH:mm:ss'): string {
+  endDate(date: string | number, mask: string | undefined, format: string = 'YYYY-MM-DDTHH:mm:ss'): string {
     return moment(date, mask).endOf('day').format(format);
   }
 

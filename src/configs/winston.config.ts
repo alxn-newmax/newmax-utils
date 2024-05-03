@@ -1,4 +1,19 @@
-export const winstonConfig = {
+interface IConfig {
+  levels: {
+    [key: string]: number;
+  },
+  colors: {
+    [key: string]: string;
+  },
+  colorsCode: {
+    [key: string]: number;
+  },
+  emoji: {
+    [key: string]: string;
+  }
+}
+
+export const winstonConfig: IConfig = {
   levels: {
     error: 0,
     warn: 1,

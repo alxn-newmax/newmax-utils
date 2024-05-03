@@ -11,15 +11,15 @@ export function conditionByDates(dateFrom: DateType, dateTo: DateType, key: stri
 
   if (dateFrom && !dateTo) {
     condition[key] = {
-      [Op.gte]: Moment.startDate(dateFrom, null, 'x')
+      [Op.gte]: Moment.startDate(dateFrom, undefined, 'x')
     };
   } else if (!dateFrom && dateTo) {
     condition[key] = {
-      [Op.lte]: Moment.startDate(dateTo, null, 'x')
+      [Op.lte]: Moment.startDate(dateTo, undefined, 'x')
     };
   } else if (dateFrom && dateTo) {
     condition[key] = {
-      [Op.between]: [Moment.startDate(dateFrom, null, 'x'), Moment.startDate(dateTo, null, 'x')],
+      [Op.between]: [Moment.startDate(dateFrom, undefined, 'x'), Moment.startDate(dateTo, undefined, 'x')],
     };
   }
   

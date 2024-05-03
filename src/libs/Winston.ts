@@ -1,20 +1,66 @@
-import winston from 'winston';
+import winston, { LogEntry } from 'winston';
+import * as Transport from 'winston-transport';
 import { Logtail } from '@logtail/node';
 import { LogtailTransport } from '@logtail/winston';
-import { config } from '../config/winston.config.js';
-import TelegramTransport from './TelegramTransport.js';
+import { winstonConfig } from '../configs/winston.config';
+import TelegramTransport from '../utils/TelegramTransport';
 
-const logtail = new Logtail(process.env.BETTERSTACK_TOKEN);
+const logtail = new Logtail(process.env.BETTERSTACK_TOKEN as string);
 
 const { combine, timestamp, errors, json, simple, printf } = winston.format;
 
-winston.addColors(config.colors);
+winston.addColors(winstonConfig.colors);
+
+interface IWinstonLoggerOpts {
+  tag: string;
+  service: string
+  filename: string;
+  thread_id: number
+}
+
+type InstanceParams = {
+  fn: string;
+  file?: {
+    level?: string;
+    disable?: boolean;
+  }
+  console?: {
+    level?: string;
+    disable?: boolean;
+    stack?: boolean;
+    data?: boolean
+  }
+  telegram?: {
+    disable?: boolean;
+    disableNotifications?: boolean;
+  }
+}
+
+interface ILogEntry extends LogEntry {
+  level: string;
+  message: string;
+  metadata?: any;
+  chat_id?: string;
+  message_thread_id?: number;
+  timestamp?: string 
+  service?: string   
+  stack?: string
+  fn?: string
+}
 
 /**
  * Inversion of control container for winston logger instances.
  */
 class WinstonLogger {
-  #params = {};
+  #params: InstanceParams = {
+    fn: '',
+  }
+
+  tag: string;
+  service: string;
+  filename: string;
+  thread_id: number;
+  lowLevel: string;
 
   /**
    * @constructs
@@ -24,7 +70,7 @@ class WinstonLogger {
    * @param {!string} options.filename - Filename of the log file. (Fullname of the service)
    * @param {!string} options.thread_id - Telegram topic id.
    */
-  constructor(options) {
+  constructor(options: IWinstonLoggerOpts) {
     if (!options.tag) {
       throw new Error('The tag of the service is required.');
     }
@@ -61,29 +107,10 @@ class WinstonLogger {
      * The lowest level of logs.
      * @type {string}
      */
-    this.lowLevel = Object.entries(config.levels).sort((a, b) => b[1] - a[1])[0][0];
+    this.lowLevel = Object.entries(winstonConfig.levels).sort((a, b) => b[1] - a[1])[0][0];
   }
 
-  /**
-   * Method to create Logger instance.
-   * @param {Object} [params] - Instance params.
-   * @param {string} [params.fn] - Service name.
-   * @param {Object} [params.console] - Custom props to console transport.
-   * @param {string} [params.console.level=info] - Custom level to console transport. Defaults 'info'.
-   * @param {boolean} [params.console.disable=false] - True if you want to disable console transport. Defaults false.
-   * @param {boolean} [params.console.stack=true] - Show stack when logging errors. Defaults true.
-   * @param {boolean} [params.console.data=true] - True if you want to log data. Defaults true.
-   * @param {Object} [params.file] - Custom props to file transport.
-   * @param {string} [params.file.level=info] - Custom level to file transport.
-   * @param {boolean} [params.file.disable=false] - True if you want to disable file transport. Defaults false.
-   * @return {Logger} Logger instance.
-   * @example
-   *    const logger = Logger.createInstance({
-   *      console: { level: 'warn' },
-   *       file: { disable: true },
-   *    });
-   */
-  createInstance = (params) => {
+  createInstance = (params: InstanceParams) => {
     this.#params = params;
 
     const consoleConfig = {
@@ -98,10 +125,10 @@ class WinstonLogger {
     const telegramConfig = {
       // level: 'info',
       thread_id: this.thread_id,
-      disableNotification: params?.telegram?.disableNotification,
+      disableNotification: params?.telegram?.disableNotifications,
     };
 
-    const transports = [new LogtailTransport(logtail, { level: 'custom' })];
+    const transports: Transport[] = [new LogtailTransport(logtail, { level: 'custom' })];
 
     if (!params?.console?.disable) {
       transports.push(new winston.transports.Console(consoleConfig));
@@ -114,49 +141,42 @@ class WinstonLogger {
     }
 
     return winston.createLogger({
-      levels: config.levels,
+      levels: winstonConfig.levels,
       format: combine(timestamp({ format: 'YYYY-MM-DD HH:mm:ss' })),
-      defaultMeta: { tag: this.tag, service: this.service, fn: params?.fn, env: process.env.NODE_ENV },
+      defaultMeta: { tag: this.tag, service: this.service, fn: params?.fn, env: process.env.NODE_ENV as string },
       transports,
     });
   };
 
-  /**
-   * Method to colorize message.
-   * @param {number} colorCode - Color code.
-   * @param {string} message - Message for formatting.
-   * @return {string} The formatted line returns.
-   * @example Logger.colorize(config.colorsCode.magenta, 'Test message');
-   */
-  colorize = (colorCode, message) => {
-    const codeExist = Object.values(config.colorsCode).includes(colorCode);
+  colorize = (colorCode: number, message: string) => {
+    const codeExist = Object.values(winstonConfig.colorsCode).includes(colorCode);
     if (!codeExist) throw new Error('The color is not supported.');
     if (!message) throw new Error('The message is required.');
     return `\x1b[${colorCode}m${message}\x1b[0m`;
   };
 
-  #formatMessage = (info) => {
+  #formatMessage = (info: ILogEntry) => {
     const { timestamp, service, level, message, stack, fn } = info;
 
     const isStack = typeof this.#params?.console?.stack === 'boolean';
     const isData = typeof this.#params?.console?.data === 'boolean';
 
-    const colorName = config.colors[level];
-    const colorCode = config.colorsCode[colorName];
+    const colorName = winstonConfig.colors[level];
+    const colorCode = winstonConfig.colorsCode[colorName];
     const fastInfo = this.colorize(colorCode, `${timestamp} [${service}] ${level}:`);
 
-    const colorFnName = fn ? this.colorize(config.colorsCode.grey, fn) : '';
+    const colorFnName = fn ? this.colorize(winstonConfig.colorsCode.grey, fn) : '';
 
-    const stackStatus = isStack ? this.#params.console.stack : true;
-    const dataStatus = isData ? this.#params.console.data : true;
+    const stackStatus = isStack ? this.#params?.console?.stack : true;
+    const dataStatus = isData ? this.#params?.console?.data : true;
 
     let result = `${fastInfo} ${colorFnName}`;
     if (message) result += ` ${message}`;
     if (level === 'debug' && dataStatus) {
-      result += '\n' + JSON.stringify(info, 0, 2);
+      result += '\n' + JSON.stringify(info, null, 2);
     }
     if (stack && stackStatus) {
-      result += `\n${this.colorize(config.colorsCode.grey, stack)}`;
+      result += `\n${this.colorize(winstonConfig.colorsCode.grey, stack)}`;
     }
 
     return result;

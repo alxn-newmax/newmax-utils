@@ -1,7 +1,3 @@
-type ApiErrorData = {
-  [key: string]: any;
-};
-
 /**
  * Класс используемый для выброса ошибки со статус кодом.
  * @param {number} statusCode - Response status code. (required)
@@ -15,9 +11,9 @@ type ApiErrorData = {
  */
 export class ApiError extends Error {
   statusCode: number;
-  data?: ApiErrorData;
+  data?: any;
 
-  constructor(statusCode: number, message: string, data?: ApiErrorData) {
+  constructor(statusCode: number, message: string, data?: any) {
     super();
 
     if (!statusCode || !message) {
